@@ -1,0 +1,35 @@
+# ============================================================
+# uploads/evidence/.htaccess
+# Apache security configuration for uploaded evidence files
+# ============================================================
+#
+# PURPOSE: Block all direct HTTP access to uploaded files.
+# Evidence files MUST be served only through a PHP controller that:
+#   1. Verifies the requesting user is authenticated
+#   2. Validates the file belongs to an evidence record
+#   3. Confirms the user has permission to view that record
+#   4. Streams the file with the correct Content-Type header
+#
+# This directory contains:
+#   - Photos and videos from crime scenes
+#   - Sensitive case evidence
+#   - Potentially confidential or restricted content
+#
+# Direct HTTP access allows attackers to:
+#   - Bypass access control (view files without permission)
+#   - Enumerate case numbers and evidence IDs
+#   - Download all evidence without authentication
+#
+# ============================================================
+
+# Disable directory listing — do not show file names if someone requests /uploads/evidence/
+Options -Indexes
+
+# Deny access to all files in this directory from the web
+Deny from all
+
+# Additional hardening: prevent execution of scripts
+# (redundant but defence-in-depth — uploaded JPGs/PDFs should never execute anyway)
+<FilesMatch "\.(php|phtml|php3|php4|php5|phps|phar|shtml|pht|phpt|pgif|pjpeg|pjpg|plhtml)$">
+    Deny from all
+</FilesMatch>
