@@ -6,14 +6,54 @@
  * SETUP: Edit the four DB_* constants below to match your environment.
  */
 
+// Development debugging: show full PHP errors locally.
+// In production, keep display_errors disabled for safety.
+$appEnv = getenv('APP_ENV') ?: 'development';
+if ($appEnv !== 'production') {
+    ini_set('display_errors', '1');
+    error_reporting(E_ALL);
+} else {
+    ini_set('display_errors', '0');
+    error_reporting(E_ALL);
+}
+
 // ── Database credentials ────────────────────────────────────────────────────
-define('DB_HOST',    'localhost');          // Database server hostname
+define('DB_HOST',    '127.0.0.1');          // Use IP so PHP connects over TCP, not socket
 define('DB_PORT',    '3306');              // MySQL/MariaDB default port
-define('DB_NAME',    'evidence_manager');  // Database name you created
-define('DB_USER',    'root');              // CHANGE: your database username
-define('DB_PASS',    '');                  // CHANGE: your database password
+define('DB_NAME',    'evidence_manager');  // Database name
+define('DB_USER',    'em_user');           // App database user
+define('DB_PASS',    'em_pass_dev');       // App database password (change in production)
 define('DB_CHARSET', 'utf8mb4');           // Full Unicode support
 // ────────────────────────────────────────────────────────────────────────────
+
+// Create one shared PDO instance immediately for scripts that expect $pdo.
+$host = DB_HOST;
+$db   = DB_NAME;
+$user = DB_USER;
+$pass = DB_PASS;
+
+try {
+    $pdo = new PDO(
+        "mysql:host=$host;dbname=$db;charset=utf8mb4",
+        $user,
+        $pass,
+        [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]
+    );
+} catch (PDOException $e) {
+    // Development: show exact database error for fast debugging.
+    // Production: show generic error, log full details server-side.
+    if ($appEnv !== 'production') {
+        die('Database connection failed: ' . $e->getMessage());
+    }
+
+    error_log('[Evidence Manager] DB connection failed: ' . $e->getMessage());
+    http_response_code(500);
+    die('A database error occurred. Please contact the system administrator.');
+}
 
 /**
  * Returns a shared PDO instance (singleton pattern).
@@ -23,32 +63,6 @@ define('DB_CHARSET', 'utf8mb4');           // Full Unicode support
  */
 function getDB(): PDO
 {
-    static $pdo = null;
-
-    if ($pdo === null) {
-        $dsn = sprintf(
-            'mysql:host=%s;port=%s;dbname=%s;charset=%s',
-            DB_HOST, DB_PORT, DB_NAME, DB_CHARSET
-        );
-
-        $options = [
-            // Throw exceptions on SQL errors (do not use silent failures)
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            // Return rows as associative arrays by default
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            // Use real prepared statements (prevents emulated statement attacks)
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ];
-
-        try {
-            $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
-        } catch (PDOException $e) {
-            // Log the real error server-side; never expose DB details to users
-            error_log('[Evidence Manager] DB connection failed: ' . $e->getMessage());
-            http_response_code(500);
-            die('A database error occurred. Please contact the system administrator.');
-        }
-    }
-
+    global $pdo;
     return $pdo;
 }
